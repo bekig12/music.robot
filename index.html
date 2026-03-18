@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DFPlayer Sequence Simulator (REAL AUDIO)</title>
+
+<style>
+body {font-family: Courier New; text-align:center; background:#121212; color:#eee;}
+.container {max-width:600px; margin:auto; padding:20px; background:#1e1e1e; border-radius:12px;}
+.timer-display {font-size:32px; color:#00e676; margin:20px;}
+.status-box {padding:10px; font-size:20px; margin:10px;}
+.waiting {color:#ff9100;}
+.playing {color:#2979ff;}
+.idle {color:#777;}
+.interim {color:#00bcd4; border:1px solid #00bcd4;}
+input {width:60px; background:#333; color:white; margin:3px; border:1px solid #555;}
+button {padding:10px 20px; margin:5px; border:none; border-radius:6px; cursor:pointer;}
+.input-group {text-align:left; display:inline-block;}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>DFPlayer Sequence Simulator 🔊</h2>
+
+<div id="statusBox" class="status-box idle">Idle</div>
+
+<div>Current Track: <span id="trackDisplay">01.mp3</span></div>
+
+<div class="timer-display" id="timer">00:00:00</div>
+
+<button onclick="startSequence()">▶ START</button>
+<button onclick="stopSequence()">⛔ STOP</button>
+<button onclick="refreshTimer()">🔄 REFRESH</button>
+
+<br><br>
+
+<audio id="player"></audio>
+
+<div class="input-group">
+
+1st OFF (Wait): <input id="t1_off" value="3"><br>
+💥1st PLAY (01.mp3): <input id="t1_play" value="90"><br>
+
+2nd OFF (Wait): <input id="mid_off" value="56"><br>
+🚼2nd PLAY: <input id="mid_play" value="20"><br>
+
+3rd OFF (Wait): <input id="last_off" value="60"><br>
+🛤️3rd PLAY: <input id="last_play" value="52"><br>
+
+4th OFF (Wait): <input id="t4_off" value="92"><br>
+🚼4th PLAY (Start): <input id="t4_play" value="18"><br>
+
+5th OFF (Wait): <input id="t5_off" value="80"><br>
+💥5th PLAY (01.mp3): <input id="t5_play" value="90"><br>
+
+<strong>
+<br>
+💯6th OFF (Delay): <input id="t5_post_delay" value="213">
+</strong>
+
+</div>
+</div>
+
+<script>
+
+let running = false;
+let trackIndex = 2;
+let startTime;
+let timerLoop;
+
+const player = document.getElementById("player");
+const timerDisplay = document.getElementById("timer");
+const trackName = document.getElementById("trackDisplay");
+const statusBox = document.getElementById("statusBox");
+
+
+function playMusicForTime(file, duration, isInterim = false)
+{
+    return new Promise(resolve => {
+
+        if (!running) return resolve();
+
+        player.src = "audio/" + file;
+
+        trackName.innerText = file;
+
+        if (isInterim)
+        {
+            statusBox.innerText = `Interim: ${file} (${duration}s)`;
+            statusBox.className = "status-box interim";
+        }
+        else
+        {
+            statusBox.innerText = "Playing " + file;
+            statusBox.className = "status-box playing";
+        }
+
+        player.currentTime = 0;
+
+        player.play().catch(e => console.log("Audio blocked"));
+
+        const startT = Date.now();
+
+        const loop = setInterval(() => {
+
+            if (!running)
+            {
+                clearInterval(loop);
+                player.pause();
+                return resolve();
+            }
+
+            const elapsed = (Date.now() - startT) / 1000;
+
+            if (elapsed >= duration)
+            {
+                clearInterval(loop);
+                player.pause();
+                return resolve();
+            }
+
+        }, 200);
+
+    });
+}
+
+
+function wait(sec)
+{
+    if (!running) return Promise.resolve();
+
+    statusBox.innerText = `Waiting ${sec}s...`;
+    statusBox.className = "status-box waiting";
+
+    return new Promise(res =>
+        setTimeout(res, sec * 1000)
+    );
+}
+
+
+function updateTimer()
+{
+    timerLoop = setInterval(() => {
+
+        if (!running) return;
+
+        const diff = Date.now() - startTime;
+
+        const s = Math.floor(diff / 1000);
+        const m = Math.floor(s / 60);
+        const h = Math.floor(m / 60);
+
+        timerDisplay.innerText =
+            `${String(h).padStart(2,'0')}:` +
+            `${String(m % 60).padStart(2,'0')}:` +
+            `${String(s % 60).padStart(2,'0')}`;
+
+    }, 500);
+}
+
+
+function refreshTimer()
+{
+    if (running) return;
+
+    clearInterval(timerLoop);
+
+    timerDisplay.innerText = "00:00:00";
+
+    statusBox.innerText = "Timer Reset";
+    statusBox.className = "status-box idle";
+}
+
+
+async function startSequence()
+{
+    if (running) return;
+
+    running = true;
+
+    startTime = Date.now();
+
+    updateTimer();
+
+    const INTERIM_TIME = 8;
+
+    while (running)
+    {
+
+        await wait(parseInt(t1_off.value));
+        await playMusicForTime("01.mp3", parseInt(t1_play.value));
+
+
+        await wait(parseInt(mid_off.value));
+        await playMusicForTime(
+            trackIndex.toString().padStart(2,"0") + ".mp3",
+            parseInt(mid_play.value)
+        );
+
+        await playMusicForTime("19.mp3", INTERIM_TIME, true);
+        trackIndex++;
+
+
+        await wait(parseInt(last_off.value));
+        await playMusicForTime(
+            trackIndex.toString().padStart(2,"0") + ".mp3",
+            parseInt(last_play.value)
+        );
+
+        await playMusicForTime("17.mp3", INTERIM_TIME, true);
+        trackIndex++;
+
+
+        await wait(parseInt(t4_off.value));
+        await playMusicForTime(
+            trackIndex.toString().padStart(2,"0") + ".mp3",
+            parseInt(t4_play.value)
+        );
+
+        await playMusicForTime("19.mp3", INTERIM_TIME, true);
+        trackIndex++;
+
+
+        await wait(parseInt(t5_off.value));
+        await playMusicForTime("01.mp3", parseInt(t5_play.value));
+
+
+        await wait(parseInt(t5_post_delay.value));
+
+
+        if (trackIndex > 255)
+            trackIndex = 2;
+
+    }
+}
+
+
+function stopSequence()
+{
+    running = false;
+
+    clearInterval(timerLoop);
+
+    player.pause();
+
+    statusBox.innerText = "Stopped";
+    statusBox.className = "status-box idle";
+}
+
+</script>
+
+</body>
+</html>
