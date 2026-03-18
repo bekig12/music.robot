@@ -84,7 +84,7 @@ function playMusicForTime(file, duration, isInterim = false)
 
         if (!running) return resolve();
 
-        player.src = "audio/" + file;
+        player.src = "/" + file;
 
         trackName.innerText = file;
 
